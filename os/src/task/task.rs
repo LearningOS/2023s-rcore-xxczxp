@@ -1,25 +1,40 @@
 //! Types related to task management
 
-use super::TaskContext;
+use alloc::{vec::{Vec, self}, boxed::Box};
 
-/// The task control block (TCB) of a task.
-#[derive(Copy, Clone)]
+use super::TaskContext;
+// use crate::syscall::process;
+use crate::config::{ MAX_SYSCALL_NUM, MAX_APP_NUM};
+
+#[derive(Copy, Clone,Debug)]
+pub struct SyscallInfo {
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub time: usize,
+    pub is_first :bool
+}
+impl SyscallInfo {
+    pub fn zero_init() -> Self {
+        Self {
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            time: 0,
+            is_first : true,
+        }
+    }
+}
+#[derive(Debug,Clone)]
+/// task control block structure
 pub struct TaskControlBlock {
-    /// The task status in it's lifecycle
     pub task_status: TaskStatus,
-    /// The task context
     pub task_cx: TaskContext,
+    pub task_info: Box<SyscallInfo>
+    // LAB1: Add whatever you need about the Task.
 }
 
-/// The status of a task
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq,Debug)]
+/// task status: UnInit, Ready, Running, Exited
 pub enum TaskStatus {
-    /// uninitialized
     UnInit,
-    /// ready to run
     Ready,
-    /// running
     Running,
-    /// exited
     Exited,
 }

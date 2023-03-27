@@ -15,8 +15,6 @@
 //! We then call [`task::run_first_task()`] and for the first time go to
 //! userspace.
 
-#![deny(missing_docs)]
-#![deny(warnings)]
 #![no_std]
 #![no_main]
 #![feature(panic_info_message)]
@@ -29,16 +27,16 @@ extern crate alloc;
 
 #[macro_use]
 mod console;
-pub mod config;
+mod config;
 mod heap_alloc;
-pub mod lang_items;
+mod lang_items;
 mod loader;
-pub mod logging;
-pub mod sbi;
-pub mod sync;
+mod logging;
+mod sbi;
+mod sync;
 pub mod syscall;
 pub mod task;
-pub mod timer;
+mod timer;
 pub mod trap;
 
 core::arch::global_asm!(include_str!("entry.asm"));
@@ -56,52 +54,19 @@ fn clear_bss() {
     }
 }
 
-/// kernel log info
-fn kernel_log_info() {
-    extern "C" {
-        fn stext(); // begin addr of text segment
-        fn etext(); // end addr of text segment
-        fn srodata(); // start addr of Read-Only data segment
-        fn erodata(); // end addr of Read-Only data ssegment
-        fn sdata(); // start addr of data segment
-        fn edata(); // end addr of data segment
-        fn sbss(); // start addr of BSS segment
-        fn ebss(); // end addr of BSS segment
-        fn boot_stack_lower_bound(); // stack lower bound
-        fn boot_stack_top(); // stack top
-    }
-    logging::init();
-    println!("[kernel] Hello, world!");
-    trace!(
-        "[kernel] .text [{:#x}, {:#x})",
-        stext as usize,
-        etext as usize
-    );
-    debug!(
-        "[kernel] .rodata [{:#x}, {:#x})",
-        srodata as usize, erodata as usize
-    );
-    info!(
-        "[kernel] .data [{:#x}, {:#x})",
-        sdata as usize, edata as usize
-    );
-    warn!(
-        "[kernel] boot_stack top=bottom={:#x}, lower_bound={:#x}",
-        boot_stack_top as usize, boot_stack_lower_bound as usize
-    );
-    error!("[kernel] .bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
-}
-
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
     clear_bss();
-    kernel_log_info();
+    logging::init();
+    println!("[kernel] Hello, world!");
     heap_alloc::init_heap();
     trap::init();
     loader::load_apps();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
+    println!("[kernel] hahah");
     task::run_first_task();
+    
     panic!("Unreachable in rust_main!");
 }

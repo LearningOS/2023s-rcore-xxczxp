@@ -7,24 +7,27 @@
 
 use crate::config::*;
 use crate::trap::TrapContext;
-use core::arch::asm;
 
 #[repr(align(4096))]
 #[derive(Copy, Clone)]
+/// kernel stack structure
 struct KernelStack {
     data: [u8; KERNEL_STACK_SIZE],
 }
 
 #[repr(align(4096))]
 #[derive(Copy, Clone)]
+/// user stack structure
 struct UserStack {
     data: [u8; USER_STACK_SIZE],
 }
 
+/// kernel stack instance
 static KERNEL_STACK: [KernelStack; MAX_APP_NUM] = [KernelStack {
     data: [0; KERNEL_STACK_SIZE],
 }; MAX_APP_NUM];
 
+/// user stack instance
 static USER_STACK: [UserStack; MAX_APP_NUM] = [UserStack {
     data: [0; USER_STACK_SIZE],
 }; MAX_APP_NUM];
@@ -72,7 +75,7 @@ pub fn load_apps() {
     let app_start = unsafe { core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1) };
     // clear i-cache first
     unsafe {
-        asm!("fence.i");
+        core::arch::asm!("fence.i");
     }
     // load apps
     for i in 0..num_app {

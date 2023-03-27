@@ -6,7 +6,7 @@
 //! A single global instance of [`TaskManager`] called `TASK_MANAGER` controls
 //! all the tasks in the operating system.
 //!
-//! Be careful when you see `__switch` ASM function in `switch.S`. Control flow around this function
+//! Be careful when you see [`__switch`]. Control flow around this function
 //! might not be what you expect.
 
 mod context;
@@ -14,11 +14,20 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use core::cell::RefMut;
+use core::convert::TryInto;
+use core::mem::{self, MaybeUninit};
+
+
+use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::task::task::SyscallInfo;
+use crate::timer::{get_time, get_time_us};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use lazy_static::*;
-use switch::__switch;
+pub use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
@@ -34,30 +43,52 @@ pub use context::TaskContext;
 /// existing functions on `TaskManager`.
 pub struct TaskManager {
     /// total number of tasks
-    num_app: usize,
+    pub num_app: usize,
     /// use inner value to get mutable access
-    inner: UPSafeCell<TaskManagerInner>,
+    pub inner: UPSafeCell<TaskManagerInner>,
 }
 
-/// Inner of Task Manager
+/// The task manager inner in 'UPSafeCell'
 pub struct TaskManagerInner {
     /// task list
-    tasks: [TaskControlBlock; MAX_APP_NUM],
+    pub tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
-    current_task: usize,
+    pub current_task: usize,
 }
 
+
+
 lazy_static! {
-    /// Global variable: TASK_MANAGER
+    /// a `TaskManager` instance through lazy_static!
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
-        let mut tasks = [TaskControlBlock {
-            task_cx: TaskContext::zero_init(),
-            task_status: TaskStatus::UnInit,
-        }; MAX_APP_NUM];
-        for (i, task) in tasks.iter_mut().enumerate() {
-            task.task_cx = TaskContext::goto_restore(init_app_cx(i));
-            task.task_status = TaskStatus::Ready;
+        
+        let mut tasks:[TaskControlBlock;MAX_APP_NUM] = {
+            // Create an uninitialized array of `MaybeUninit`. The `assume_init` is
+            // safe because the type we are claiming to have initialized here is a
+            // bunch of `MaybeUninit`s, which do not require initialization.
+            let mut data: [MaybeUninit<TaskControlBlock>; MAX_APP_NUM] = unsafe {
+                MaybeUninit::uninit().assume_init()
+            };
+        
+            // Dropping a `MaybeUninit` does nothing, so if there is a panic during this loop,
+            // we have a memory leak, but there is no memory safety issue.
+            for elem in &mut data[..] {
+                elem.write(TaskControlBlock {
+                    task_cx: TaskContext::zero_init(),
+                    task_status: TaskStatus::UnInit,
+                    task_info: Box::new(SyscallInfo::zero_init()),
+                });
+            }
+        
+            // Everything is initialized. Transmute the array to the
+            // initialized type.
+            unsafe { mem::transmute::<_, [TaskControlBlock;MAX_APP_NUM]>(data) }
+        };
+
+        for (i, t) in tasks.iter_mut().enumerate().take(num_app) {
+            t.task_cx = TaskContext::goto_restore(init_app_cx(i));
+            t.task_status = TaskStatus::Ready;
         }
         TaskManager {
             num_app,
@@ -81,6 +112,10 @@ impl TaskManager {
         let task0 = &mut inner.tasks[0];
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
+
+        //Lab1
+        inner.tasks[0].task_info.is_first=false;
+        inner.tasks[0].task_info.time=get_time_us();
         drop(inner);
         let mut _unused = TaskContext::zero_init();
         // before this, we should drop local variables that must be dropped manually
@@ -120,6 +155,14 @@ impl TaskManager {
     fn run_next_task(&self) {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
+
+            //lab1
+            if inner.tasks[next].task_info.is_first {
+                inner.tasks[next].task_info.is_first=false;
+                inner.tasks[next].task_info.time=get_time_us();
+                println!("[lab1]task {} has been start",next);
+            }
+
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
@@ -130,11 +173,17 @@ impl TaskManager {
             unsafe {
                 __switch(current_task_cx_ptr, next_task_cx_ptr);
             }
+            
             // go back to user mode
         } else {
             panic!("All applications completed!");
         }
     }
+    pub fn get_inner(&self) -> RefMut<TaskManagerInner>{
+        self.inner.exclusive_access()
+    }
+
+    // LAB1: Try to implement your function to update or get task info!
 }
 
 /// Run the first task in task list.
@@ -169,3 +218,6 @@ pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
 }
+
+// LAB1: Public functions implemented here provide interfaces.
+// You may use TASK_MANAGER member functions to handle requests.

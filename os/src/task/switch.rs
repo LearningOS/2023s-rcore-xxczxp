@@ -5,10 +5,9 @@
 //! language (Do you know why?), so this module really is just a wrapper around
 //! `switch.S`.
 
-use super::TaskContext;
-use core::arch::global_asm;
+core::arch::global_asm!(include_str!("switch.S"));
 
-global_asm!(include_str!("switch.S"));
+use super::TaskContext;
 
 extern "C" {
     /// Switch to the context of `next_task_cx_ptr`, saving the current context
