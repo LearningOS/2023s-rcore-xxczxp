@@ -2,10 +2,6 @@ name: Jobs
 
 on: [push]
 
-permissions:
-  checks: write
-  actions: read
-  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,8 +10,6 @@ env:
 jobs:
   basic-test:
     runs-on: ubuntu-latest
-    outputs:
-      points: ${{ steps.end.outputs.points}}
     container:
       image: duskmoon/dev-env:rcore-ci
     steps:
