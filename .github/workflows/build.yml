@@ -13,6 +13,9 @@ jobs:
     container:
       image: duskmoon/dev-env:rcore-ci
     steps:
+      - name: Run start
+        run: |
+          sudo echo "ohohohohohohohohohohohoh"
       - uses: actions/checkout@v3
       - name: Run tests
         run: |
