@@ -28,8 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       points: ${{ steps.end.outputs.points}}
-    container:
-      image: duskmoon/dev-env:rcore-ci
+#    container:
+#      image: duskmoon/dev-env:rcore-ci
     steps:
       - uses: actions/checkout@v3
       - name: Run tests
