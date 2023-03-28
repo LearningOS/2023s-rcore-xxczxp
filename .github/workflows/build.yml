@@ -3,15 +3,10 @@ name: Jobs
 on: [push]
 
 
-env:
-  CARGO_TERM_COLOR: always
-  rust_toolchain: nightly-2022-08-05
 
 jobs:
   basic-test:
     runs-on: ubuntu-latest
-    container:
-      image: duskmoon/dev-env:rcore-ci
     steps:
       - name: Run start
         run: |
