@@ -1,29 +1,18 @@
-name: Jobs
-
+name: GitHub Actions Demo
+run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
 on: [push]
-
-
-
 jobs:
-  basic-test:
+  Explore-GitHub-Actions:
     runs-on: ubuntu-latest
     steps:
-      - name: Run start
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+      - name: List files in the repository
         run: |
-          sudo echo "ohohohohohohohohohohohoh"
-      - uses: actions/checkout@v3
-      - name: Run tests
-        run: |
-          qemu-system-riscv64 --version
-          rustup target add riscv64gc-unknown-none-elf
-          git config --global --add safe.directory /__w/rCore-Tutorial-Code-2023S/rCore-Tutorial-Code-2023S
-          git clone https://github.com/LearningOS/rCore-Tutorial-Checker-2023S.git ci-user
-          git clone https://github.com/LearningOS/rCore-Tutorial-Test-2023S.git ci-user/user
-          ID=`git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]'`
-          cd ci-user && make test CHAPTER=$ID passwd=${{ secrets.BASE_TEST_TOKEN }} > ../output.txt
-          cat ../output.txt
-      - name: end
-        id: end
-        run: |
-          cat output.txt | grep -a "Test passed" | grep -oP "\d{1,}/\d{1,}" | xargs -i echo "points={}"
-          cat output.txt | grep -a "Test passed" | grep -oP "\d{1,}/\d{1,}" | xargs -i echo "points={}" >> $GITHUB_OUTPUT
+          ls ${{ github.workspace }}
+      - run: echo "🍏 This job's status is ${{ job.status }}."
