@@ -23,6 +23,7 @@ mod switch;
 mod task;
 
 use crate::fs::{open_file, OpenFlags};
+use crate::{timer::get_time_us, syscall::process::TaskInfo, mm::{VirtAddr, MapPermission}};
 use alloc::sync::Arc;
 pub use context::TaskContext;
 use lazy_static::*;
@@ -119,4 +120,42 @@ lazy_static! {
 ///Add init process to the manager
 pub fn add_initproc() {
     add_task(INITPROC.clone());
+}
+
+/// lab1
+pub fn info_current_syscall(syscall_id: usize){
+    let task=current_task().unwrap();
+    let mut inner=task.inner_exclusive_access();
+    inner.syscall_info.syscall_times[syscall_id]+=1;
+}
+
+/// lab1
+pub fn get_task_info()-> TaskInfo{
+    let task=current_task().unwrap();
+    let inner=task.inner_exclusive_access();
+    TaskInfo {status: inner.task_status,
+    syscall_times: inner.syscall_info.syscall_times,
+    time:(get_time_us()-inner.syscall_info.time)/1000}
+}
+
+///lab2
+pub fn task_mmap(start_va: VirtAddr,end_va: VirtAddr,permission:MapPermission)->isize{
+    let task=current_task().unwrap();
+    let mut cur_task_inner=task.inner_exclusive_access();
+    if cur_task_inner.memory_set.is_overlapping(start_va, end_va) {
+        trace!("kernel: mmap overlapping area");
+        return -1;
+    }
+    cur_task_inner.memory_set.insert_framed_area(start_va,end_va,MapPermission::U | permission);
+    0
+}
+
+
+///lab2
+pub fn task_munmap(start_va: VirtAddr,end_va: VirtAddr)->isize{
+    assert!(start_va<end_va);
+    let task=current_task().unwrap();
+    let mut cur_task_inner=task.inner_exclusive_access();
+    cur_task_inner.memory_set.delete_range(start_va,end_va)
+
 }

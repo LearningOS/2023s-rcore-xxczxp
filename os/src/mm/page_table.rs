@@ -1,6 +1,7 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
 use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
 use alloc::string::String;
+use _core::mem::size_of;
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -275,4 +276,23 @@ impl Iterator for UserBufferIterator {
             Some(r)
         }
     }
+}
+/// Return 0 mean success,-1 fail
+pub fn copy_byte_buffer(token: usize,from:&[u8] , to: *const u8) -> isize {
+    assert!(from.len()>0);
+    let target_addr=translated_byte_buffer(token,to ,from.len());
+    let mut start:usize = 0;
+    for i in target_addr {
+        // let from_ts = &ts as 
+        i.copy_from_slice(&from[start..(start+i.len())]);
+        start+=i.len();
+    }
+    0
+}
+
+/// Copy
+pub fn copy_bytes<T>(token: usize,from: &T , to: *const u8) -> isize {
+    
+    let fs=unsafe { core::slice::from_raw_parts(from as *const T as *const u8,size_of::<T>()) };
+    copy_byte_buffer(token,fs,to)
 }

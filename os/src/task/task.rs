@@ -10,6 +10,27 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use crate::config::{MAX_SYSCALL_NUM};
+
+use alloc::boxed::Box;
+
+#[allow(unused)]
+pub struct SyscallInfo {
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub time: usize,
+    pub is_first :bool
+}
+
+#[allow(unused)]
+impl SyscallInfo {
+    pub fn zero_init() -> Self {
+        Self {
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            time: 0,
+            is_first : true,
+        }
+    }
+}
 
 /// Task control block structure
 ///
@@ -71,6 +92,9 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// use for lab1
+    pub syscall_info:Box<SyscallInfo>,
 }
 
 impl TaskControlBlockInner {
@@ -135,6 +159,7 @@ impl TaskControlBlock {
                     ],
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    syscall_info: Box::new(SyscallInfo::zero_init()),
                 })
             },
         };
@@ -216,6 +241,8 @@ impl TaskControlBlock {
                     fd_table: new_fd_table,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    syscall_info: Box::new(SyscallInfo::zero_init()),
+
                 })
             },
         });
@@ -243,6 +270,16 @@ impl TaskControlBlock {
             .unwrap()
             .ppn();
 
+        // copy fd
+        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        for fd in parent_inner.fd_table.iter() {
+            if let Some(file) = fd {
+                new_fd_table.push(Some(file.clone()));
+            } else {
+                new_fd_table.push(None);
+            }
+        }
+
         // alloc a pid and a kernel stack in kernel space
         let pid_handle = pid_alloc();
         let kernel_stack = kstack_alloc();
@@ -262,6 +299,8 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    syscall_info: Box::new(SyscallInfo::zero_init()),
+                    fd_table: new_fd_table
                 })
             },
         });

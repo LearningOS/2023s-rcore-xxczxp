@@ -318,11 +318,57 @@ impl MemorySet {
             false
         }
     }
+
+    /// lab2
+    pub fn is_overlapping(&self,start: VirtAddr, end: VirtAddr) -> bool {
+        self.areas.iter().fold(false, |t,area| t || !(end<= VirtAddr::from(area.vpn_range.get_start()) || start>= VirtAddr::from(area.vpn_range.get_end())))
+    }
+
+    ///lab2
+    pub fn find_belong_area(&mut self,start: VirtAddr, end: VirtAddr) -> Option<usize> {
+        self
+            .areas
+            .iter_mut()
+            .position(|area| area.vpn_range.get_start() <= start.floor() && area.vpn_range.get_end() >= end.ceil())
+    }
+
+    ///lab2
+    pub fn delete_range(&mut self,start: VirtAddr, end: VirtAddr) -> isize {
+        match self.find_belong_area(start, end) {
+            Some(i) => {
+                let area=&mut self.areas[i];
+                let start_vpn=start.floor();
+                let end_vpn=end.ceil();
+                if start_vpn==area.get_start() && end_vpn==area.get_end() {
+                    area.unmap(&mut self.page_table);
+                    self.areas.remove(i);
+                }
+                else if start_vpn==area.get_start() {
+                    area.shrink_to_b(&mut self.page_table, start_vpn, end_vpn);
+                }
+                else if end_vpn==area.get_end() {
+                    area.shrink_to_b(&mut self.page_table, start_vpn, end_vpn);
+                }
+                else {
+                    //split into two area, and unmap request area
+                    let area=self.areas.remove(i);
+                    let (a1,a2)=area.split_into(&mut self.page_table, start_vpn, end_vpn);
+                    self.areas.push(a1);
+                    self.areas.push(a2);
+                }
+                0
+            },
+            None => {
+                trace!("kernel: unmap not find belonging area");
+                -1
+            }
+        }
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
-    vpn_range: VPNRange,
-    data_frames: BTreeMap<VirtPageNum, FrameTracker>,
+    pub vpn_range: VPNRange,
+    pub data_frames: BTreeMap<VirtPageNum, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
@@ -417,6 +463,60 @@ impl MapArea {
             }
             current_vpn.step();
         }
+    }
+
+    pub fn get_start(&self) -> VirtPageNum {
+        self.vpn_range.get_start()
+    }
+
+    pub fn get_end(&self) -> VirtPageNum {
+        self.vpn_range.get_end()
+    }
+
+    ///lab2 shrink to with two end
+    pub fn shrink_to_b(&mut self, page_table: &mut PageTable,new_start: VirtPageNum, new_end: VirtPageNum) {
+        assert!(new_start<=new_end);
+        for vpn in VPNRange::new(new_end, self.vpn_range.get_end()) {
+            self.unmap_one(page_table, vpn)
+        }
+        for vpn in VPNRange::new(self.vpn_range.get_start(), new_start) {
+            self.unmap_one(page_table, vpn)
+        }
+        self.vpn_range = VPNRange::new(new_start, new_end);
+    }
+    ///lab2
+    /// default that first_end > self.get_start() and second_start < self.get_end()
+    pub fn split_into(mut self,page_table: &mut PageTable,first_end: VirtPageNum, second_start: VirtPageNum) -> (MapArea,MapArea) {
+        let mut a1=MapArea::new(
+            VirtAddr::from(self.get_start()),
+            VirtAddr::from(first_end),
+            MapType::Framed,
+            self.map_perm,
+        );
+        let mut a2=MapArea::new(
+            VirtAddr::from(second_start),
+            VirtAddr::from(self.get_end()),
+            MapType::Framed,
+            self.map_perm,
+        );
+        for i in VPNRange::new(a1.get_start(),a1.get_end()) {
+            let page=self.data_frames.remove(&i).unwrap();
+            let ppn=page.ppn;
+            a1.data_frames.insert(i, page);
+            let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
+            page_table.map(i, ppn, pte_flags);
+        }
+        for i in VPNRange::new(a2.get_start(),a2.get_end()) {
+            let page=self.data_frames.remove(&i).unwrap();
+            let ppn=page.ppn;
+            a2.data_frames.insert(i, page);
+            let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
+            page_table.map(i, ppn, pte_flags);
+        }
+        
+        self.vpn_range=VPNRange::new(first_end,second_start);
+        self.unmap(page_table);
+        (a1,a2)
     }
 }
 
