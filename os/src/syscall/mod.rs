@@ -102,7 +102,7 @@ pub const SYSCALL_CONDVAR_SIGNAL: usize = 472;
 pub const SYSCALL_CONDVAR_WAIT: usize = 473;
 
 mod fs;
-mod process;
+pub mod process;
 mod sync;
 mod thread;
 
@@ -112,9 +112,10 @@ use sync::*;
 use thread::*;
 
 use crate::fs::Stat;
-
+use crate::task::info_current_syscall;
 /// handle syscall exception with `syscall_id` and other arguments
-pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
+pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    info_current_syscall(syscall_id);
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),
         SYSCALL_LINKAT => sys_linkat(args[1] as *const u8, args[3] as *const u8),

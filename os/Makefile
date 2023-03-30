@@ -26,7 +26,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
 CHAPTER ?= $(shell git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]')
 TEST ?= $(CHAPTER)
-BASE ?= 1
+BASE ?= 2
 
 # Disassembly
 DISASM ?= -x

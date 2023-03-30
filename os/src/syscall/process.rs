@@ -1,11 +1,13 @@
 use crate::{
-    config::MAX_SYSCALL_NUM,
     fs::{open_file, OpenFlags},
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     mm::{translated_ref, translated_refmut, translated_str},
     task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
+        task_mmap, task_munmap,
     },
+    timer::get_time_us, mm::{copy_bytes, VirtAddr, MapPermission},
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
 
@@ -16,15 +18,21 @@ pub struct TimeVal {
     pub usec: usize,
 }
 
+impl TimeVal {
+    pub fn from_us(ut:usize) -> Self{
+        return Self{ sec: ut / 1000000, usec: ut % 1000000 };
+    }
+}
+
 /// Task information
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 /// exit syscall
 ///
@@ -164,10 +172,16 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_get_time",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+
+    let token=current_user_token();
+    let time_us =get_time_us();
+    let ts = TimeVal::from_us(time_us);
+    let res=copy_bytes(token,&ts,_ts as *mut u8);
+    trace!("kernel: sys_get_time");
+    res
 }
 
 /// task_info syscall
@@ -183,26 +197,72 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     -1
 }
 
-/// mmap syscall
-///
-/// YOUR JOB: Implement mmap.
+
+ 
+
+// YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_mmap called",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+
+    if _start & PAGE_SIZE-1 != 0 {
+        trace!("kernel: sys_mmap _start not align!");
+        return -1;
+    }
+    
+    if _port & !0x7 != 0 || _port & 0x7 == 0 {
+        trace!("kernel: sys_mmap _port not fit!");
+        return -1;
+    }
+
+    // do nothing
+    if _len==0 {
+        return 0;
+    }
+
+    let s_va= VirtAddr::from(_start);
+    let e_va = VirtAddr::from(_start+_len);
+    
+
+    let mut flag = MapPermission::empty();
+    if (_port & 0b001) != 0 {
+        flag |= MapPermission::R;
+    }
+    if (_port & 0b010) != 0 {
+        flag |= MapPermission::W;
+    }
+    if (_port & 0b100) != 0 {
+        flag |= MapPermission::X;
+    }
+
+    task_mmap(s_va,e_va,flag)
+    
+    
 }
 
-/// munmap syscall
-///
-/// YOUR JOB: Implement munmap.
+// YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_munmap called",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    // do nothing
+    if _len==0 {
+        return 0;
+    }
+    
+    if _start & PAGE_SIZE-1 != 0 {
+        trace!("kernel: sys_munmap _start not align!");
+        return -1;
+    }
+
+    let s_va= VirtAddr::from(_start);
+    let e_va = VirtAddr::from(_start+_len);
+
+
+    task_munmap(s_va,e_va)
 }
 
 /// change data segment size
@@ -217,6 +277,7 @@ pub fn sys_munmap(_start: usize, _len: usize) -> isize {
 /// spawn syscall
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
+/// can't have args 
 pub fn sys_spawn(_path: *const u8) -> isize {
     trace!(
         "kernel:pid[{}] sys_spawn ",
@@ -224,17 +285,12 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     );
     let token = current_user_token();
     let path = translated_str(token, _path);
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
-        let current_task = current_task().unwrap();
-        let new_task = current_task.spawn(data);
-        let new_pid = new_task.pid.0;
-        // modify trap context of new_task, because it returns immediately after switching
-        let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
-        // we do not have to move to next instruction since we have done it before
-        // for child process, fork returns 0
-        trap_cx.x[10] = 0;
-        // add new task to scheduler
-        add_task(new_task);
+    
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
+        let current_process = current_process();
+        let new_process = current_process.spawn(all_data.as_slice());
+        let new_pid = new_process.getpid();
         new_pid as isize
     } else {
         -1

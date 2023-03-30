@@ -8,6 +8,7 @@ use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{ProcessControlBlock, TaskContext, TaskControlBlock};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
@@ -59,6 +60,14 @@ pub fn run_tasks() {
             let mut task_inner = task.inner_exclusive_access();
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
+
+            //lab1
+            if task_inner.syscall_info.is_first {
+                task_inner.syscall_info.is_first=false;
+                task_inner.syscall_info.time=get_time_us();
+                debug!("[lab1]task with pid {} has been start",task.getpid());
+            }
+
             // release coming task_inner manually
             drop(task_inner);
             // release coming task TCB manually
