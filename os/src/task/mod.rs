@@ -16,6 +16,8 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
+use crate::syscall::process::TaskInfo;
+use crate::timer::get_time_us;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
@@ -138,6 +140,14 @@ impl TaskManager {
     fn run_next_task(&self) {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
+
+            //lab1
+            if inner.tasks[next].syscall_info.is_first {
+                inner.tasks[next].syscall_info.is_first=false;
+                inner.tasks[next].syscall_info.time=get_time_us();
+                debug!("[lab1]task {} has been start",next);
+            }
+
             let current = inner.current_task;
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
@@ -152,6 +162,21 @@ impl TaskManager {
         } else {
             panic!("All applications completed!");
         }
+    }
+
+    /// lab1
+    fn info_current_syscall(&self,syscall_id: usize){
+        let mut inner = self.inner.exclusive_access();
+        let c_task_id=inner.current_task;
+        inner.tasks[c_task_id].syscall_info.syscall_times[syscall_id]+=1;
+    }
+
+    /// lab1
+    fn get_task_info(&self)-> TaskInfo{
+        let inner = self.inner.exclusive_access();
+        TaskInfo {status: inner.tasks[inner.current_task].task_status,
+        syscall_times: inner.tasks[inner.current_task].syscall_info.syscall_times,
+    time:(get_time_us()-inner.tasks[inner.current_task].syscall_info.time)/1000}
     }
 }
 
@@ -201,4 +226,14 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// lab1
+pub fn info_current_syscall(syscall_id: usize){
+    TASK_MANAGER.info_current_syscall(syscall_id)
+}
+
+/// lab1
+pub fn get_task_info() ->TaskInfo{
+    TASK_MANAGER.get_task_info()
 }

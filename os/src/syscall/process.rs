@@ -3,7 +3,7 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, current_user_token, TaskStatus,
+        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, current_user_token, TaskStatus, get_task_info,
     }, 
     timer::get_time_us, mm::copy_bytes,
 };
@@ -25,11 +25,11 @@ impl TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 
 /// task exits and submit an exit code
@@ -62,17 +62,21 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    -1
+    let token=current_user_token();
+    let ti=get_task_info();
+    copy_bytes(token,&ti,_ti as *mut u8);
+    0
 }
 
 // YOUR JOB: Implement mmap.
+/// TODO
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
     -1
 }
 
 // YOUR JOB: Implement munmap.
+/// TODO
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
     trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
     -1
