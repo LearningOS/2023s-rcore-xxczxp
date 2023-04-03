@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{VirtAddr, MapPermission};
 use crate::sync::UPSafeCell;
 use crate::syscall::process::TaskInfo;
 use crate::timer::get_time_us;
@@ -178,6 +179,27 @@ impl TaskManager {
         syscall_times: inner.tasks[inner.current_task].syscall_info.syscall_times,
     time:(get_time_us()-inner.tasks[inner.current_task].syscall_info.time)/1000}
     }
+
+    fn mmap(&self,start_va: VirtAddr,end_va: VirtAddr,permission:MapPermission)->isize{
+        let mut inner = self.inner.exclusive_access();
+        let c_task=inner.current_task;
+        let cur_task=&mut (inner.tasks[c_task]);
+        if cur_task.memory_set.is_overlapping(start_va, end_va) {
+            trace!("kernel: mmap overlapping area");
+            return -1;
+        }
+        cur_task.memory_set.insert_framed_area(start_va,end_va,MapPermission::U | permission);
+        0
+    }
+
+    fn munmap(&self,start_va: VirtAddr,end_va: VirtAddr)->isize{
+        assert!(start_va<end_va);
+        let mut inner = self.inner.exclusive_access();
+        let c_task=inner.current_task;
+        let cur_task=&mut (inner.tasks[c_task]);
+        cur_task.memory_set.delete_range(start_va,end_va)
+
+    }
 }
 
 /// Run the first task in task list.
@@ -236,4 +258,14 @@ pub fn info_current_syscall(syscall_id: usize){
 /// lab1
 pub fn get_task_info() ->TaskInfo{
     TASK_MANAGER.get_task_info()
+}
+
+/// lab2
+pub fn task_mmap(start_va: VirtAddr,end_va: VirtAddr,permission:MapPermission)->isize {
+    TASK_MANAGER.mmap(start_va,end_va,permission)
+}
+
+/// lab2
+pub fn task_munmap(start_va: VirtAddr,end_va: VirtAddr)->isize {
+    TASK_MANAGER.munmap(start_va,end_va)
 }

@@ -1,11 +1,11 @@
 //! Process management syscalls
 
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, current_user_token, TaskStatus, get_task_info,
+        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, current_user_token, TaskStatus, get_task_info, task_mmap, task_munmap,
     }, 
-    timer::get_time_us, mm::copy_bytes,
+    timer::get_time_us, mm::{copy_bytes, VirtAddr, MapPermission},
 };
 
 #[repr(C)]
@@ -71,15 +71,59 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
 // YOUR JOB: Implement mmap.
 /// TODO
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    if _start & PAGE_SIZE-1 != 0 {
+        trace!("kernel: sys_mmap _start not align!");
+        return -1;
+    }
+    
+    if _port & !0x7 != 0 || _port & 0x7 == 0 {
+        trace!("kernel: sys_mmap _port not fit!");
+        return -1;
+    }
+
+    // do nothing
+    if _len==0 {
+        return 0;
+    }
+
+    let s_va= VirtAddr::from(_start);
+    let e_va = VirtAddr::from(_start+_len);
+    
+
+    let mut flag = MapPermission::empty();
+    if (_port & 0b001) != 0 {
+        flag |= MapPermission::R;
+    }
+    if (_port & 0b010) != 0 {
+        flag |= MapPermission::W;
+    }
+    if (_port & 0b100) != 0 {
+        flag |= MapPermission::X;
+    }
+
+    task_mmap(s_va,e_va,flag)
+    
+    
 }
 
 // YOUR JOB: Implement munmap.
 /// TODO
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    // do nothing
+    if _len==0 {
+        return 0;
+    }
+    
+    if _start & PAGE_SIZE-1 != 0 {
+        trace!("kernel: sys_munmap _start not align!");
+        return -1;
+    }
+
+    let s_va= VirtAddr::from(_start);
+    let e_va = VirtAddr::from(_start+_len);
+
+
+    task_munmap(s_va,e_va)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
