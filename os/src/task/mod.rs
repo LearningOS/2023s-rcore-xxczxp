@@ -15,11 +15,12 @@
 //! might not be what you expect.
 mod context;
 mod id;
-mod manager;
+pub mod manager;
 mod processor;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
+mod stride;
 
 use crate::{loader::get_app_data_by_name, timer::get_time_us, syscall::process::TaskInfo, mm::{VirtAddr, MapPermission}};
 use alloc::sync::Arc;

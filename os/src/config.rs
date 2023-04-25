@@ -24,5 +24,5 @@ pub const CLOCK_FREQ: usize = 12500000;
 /// the physical memory end
 pub const MEMORY_END: usize = 0x88000000;
 ///lab5 StrideInfo
-pub const INIT_PRIORITY:isize = 16;
-pub const BIGSTRDE:isize = isize::MAX >> 20; 
+pub const INIT_PRIORITY:u64 = 16;
+pub const BIGSTRDE:u64 = u64::MAX >> 20; 
