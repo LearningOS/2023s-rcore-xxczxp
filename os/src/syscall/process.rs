@@ -244,10 +244,18 @@ pub fn sys_spawn(_path: *const u8) -> isize {
 }
 
 // YOUR JOB: Set task priority.
+///lab5
 pub fn sys_set_priority(_prio: isize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_set_priority run",
         current_task().unwrap().pid.0
     );
+    if _prio>=2 {
+        let task=current_task().unwrap();
+        let mut cur_task_inner=task.inner_exclusive_access();
+        cur_task_inner.stride_info.priority=_prio;
+        return _prio;
+    }
+    error!("priority didn't fit");
     -1
 }
