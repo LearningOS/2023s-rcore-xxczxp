@@ -5,8 +5,8 @@ use crate::{
     task::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
-        task_mmap, task_munmap,
-    },
+        task_mmap, task_munmap,manager::get_task_num,
+    }, 
     timer::get_time_us, mm::{copy_bytes, VirtAddr, MapPermission},
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
@@ -79,12 +79,14 @@ pub fn sys_fork() -> isize {
 }
 /// exec syscall
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_exec",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
-    );
     let token = current_user_token();
     let path = translated_str(token, path);
+    trace!(
+        "kernel:pid[{}] sys_exec , name is : {}",
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        path
+    );
+
     let mut args_vec: Vec<String> = Vec::new();
     loop {
         let arg_str_ptr = *translated_ref(token, args);
@@ -115,9 +117,12 @@ pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     //trace!("kernel: sys_waitpid");
     let process = current_process();
+    let mut inner = process.inner_exclusive_access();
+    trace!("kernel::pid[{}] sys_waitpid [{}]", process.getpid(), pid);
+    trace!("current task num is {}",get_task_num());
     // find a child process
 
-    let mut inner = process.inner_exclusive_access();
+    
     if !inner
         .children
         .iter()
@@ -181,6 +186,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     let ts = TimeVal::from_us(time_us);
     let res=copy_bytes(token,&ts,_ts as *mut u8);
     trace!("kernel: sys_get_time");
+    trace!("kernel::pid[{}] sys_get_time {} us", current_process().getpid(),time_us);
     res
 }
 
@@ -285,7 +291,10 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     );
     let token = current_user_token();
     let path = translated_str(token, _path);
-    
+    trace!(
+        "kernel:pid[{}] sys_spawn ,name is : {}",
+        current_process().getpid(),path
+    );
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let current_process = current_process();
@@ -310,7 +319,7 @@ pub fn sys_set_priority(_prio: isize) -> isize {
     if _prio>=2 {
         let task=current_task().unwrap();
         let mut cur_task_inner=task.inner_exclusive_access();
-        cur_task_inner.stride_info.priority=_prio;
+        cur_task_inner.stride_info.priority=_prio.try_into().unwrap();
         return _prio;
     }
     error!("priority didn't fit");

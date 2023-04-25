@@ -11,13 +11,14 @@
 
 mod context;
 mod id;
-mod manager;
 mod process;
+pub mod manager;
 mod processor;
 mod signal;
 mod switch;
 #[allow(clippy::module_inception)]
 mod task;
+mod stride;
 
 use self::id::TaskUserRes;
 use crate::fs::{open_file, OpenFlags};

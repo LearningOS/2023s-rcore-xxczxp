@@ -23,5 +23,5 @@ pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 /// qemu board info
 pub use crate::board::{CLOCK_FREQ, MMIO};
 ///lab5 StrideInfo
-pub const INIT_PRIORITY:isize = 16;
-pub const BIGSTRDE:isize = isize::MAX >> 20; 
+pub const INIT_PRIORITY:u64 = 16;
+pub const BIGSTRDE:u64 = u64::MAX >> 20; 

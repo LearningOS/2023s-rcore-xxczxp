@@ -4,9 +4,10 @@ use super::id::TaskUserRes;
 use super::{kstack_alloc, KernelStack, ProcessControlBlock, TaskContext};
 use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
+use super::stride::Stride;
 use alloc::sync::{Arc, Weak};
 use core::cell::RefMut;
-use crate::config::{MAX_SYSCALL_NUM, INIT_PRIORITY};
+use crate::config::{MAX_SYSCALL_NUM, INIT_PRIORITY, BIGSTRDE};
 
 use alloc::boxed::Box;
 
@@ -28,18 +29,21 @@ impl SyscallInfo {
     }
 }
 
-
+#[derive(Clone,Copy)]
 pub struct StrideInfo{
-    pub stride: isize,
-    pub priority:isize
+    pub stride: Stride,
+    pub priority:u64
 }
 
 impl StrideInfo {
     pub fn new() -> Self {
         Self {
-            stride: 0,
+            stride: Stride::init(),
             priority: INIT_PRIORITY,
         }
+    }
+    pub fn step(&mut self) {
+        self.stride.0+=BIGSTRDE/self.priority;
     }
 }
 
