@@ -10,7 +10,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
-use crate::config::{MAX_SYSCALL_NUM};
+use crate::config::{MAX_SYSCALL_NUM, INIT_PRIORITY};
 
 use alloc::boxed::Box;
 
@@ -28,6 +28,21 @@ impl SyscallInfo {
             syscall_times: [0; MAX_SYSCALL_NUM],
             time: 0,
             is_first : true,
+        }
+    }
+}
+
+
+pub struct StrideInfo{
+    pub stride: isize,
+    pub priority:isize
+}
+
+impl StrideInfo {
+    pub fn new() -> Self {
+        Self {
+            stride: 0,
+            priority: INIT_PRIORITY,
         }
     }
 }
@@ -95,6 +110,8 @@ pub struct TaskControlBlockInner {
 
     /// use for lab1
     pub syscall_info:Box<SyscallInfo>,
+
+    pub stride_info:StrideInfo
 }
 
 impl TaskControlBlockInner {
@@ -160,6 +177,7 @@ impl TaskControlBlock {
                     heap_bottom: user_sp,
                     program_brk: user_sp,
                     syscall_info: Box::new(SyscallInfo::zero_init()),
+                    stride_info: StrideInfo::new() 
                 })
             },
         };
@@ -242,7 +260,7 @@ impl TaskControlBlock {
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
                     syscall_info: Box::new(SyscallInfo::zero_init()),
-
+                    stride_info: StrideInfo::new() 
                 })
             },
         });
@@ -300,7 +318,8 @@ impl TaskControlBlock {
                     heap_bottom: user_sp,
                     program_brk: user_sp,
                     syscall_info: Box::new(SyscallInfo::zero_init()),
-                    fd_table: new_fd_table
+                    stride_info: StrideInfo::new(),
+                    fd_table: new_fd_table,
                 })
             },
         });
