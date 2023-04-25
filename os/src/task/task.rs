@@ -1,5 +1,6 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
+use super::stride::Stride;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
 use crate::config::TRAP_CONTEXT_BASE;
 use crate::fs::{File, Stdin, Stdout};
@@ -10,7 +11,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefMut;
-use crate::config::{MAX_SYSCALL_NUM, INIT_PRIORITY};
+use crate::config::{MAX_SYSCALL_NUM, INIT_PRIORITY, BIGSTRDE};
 
 use alloc::boxed::Box;
 
@@ -32,18 +33,21 @@ impl SyscallInfo {
     }
 }
 
-
+#[derive(Clone,Copy)]
 pub struct StrideInfo{
-    pub stride: isize,
-    pub priority:isize
+    pub stride: Stride,
+    pub priority:u64
 }
 
 impl StrideInfo {
     pub fn new() -> Self {
         Self {
-            stride: 0,
+            stride: Stride::init(),
             priority: INIT_PRIORITY,
         }
+    }
+    pub fn step(&mut self) {
+        self.stride.0+=BIGSTRDE/self.priority;
     }
 }
 
@@ -330,7 +334,7 @@ impl TaskControlBlock {
         
 
         // **** access current TCB exclusively
-        let ch_inner = task_control_block.inner_exclusive_access();
+        let ch_inner: RefMut<TaskControlBlockInner> = task_control_block.inner_exclusive_access();
 
         // initialize trap_cx
         let trap_cx = ch_inner.get_trap_cx();

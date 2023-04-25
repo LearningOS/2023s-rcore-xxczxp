@@ -26,5 +26,5 @@ pub const MEMORY_END: usize = 0x88000000;
 /// The base address of control registers in Virtio_Block device
 pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x1000)];
 ///lab5 StrideInfo
-pub const INIT_PRIORITY:isize = 16;
-pub const BIGSTRDE:isize = isize::MAX >> 20; 
+pub const INIT_PRIORITY:u64 = 16;
+pub const BIGSTRDE:u64 = u64::MAX >> 20; 

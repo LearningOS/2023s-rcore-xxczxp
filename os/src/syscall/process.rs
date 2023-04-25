@@ -7,7 +7,7 @@ use crate::{
     config::{MAX_SYSCALL_NUM, PAGE_SIZE},
     mm::{translated_refmut, translated_str},
     task::{
-        exit_current_and_run_next, suspend_current_and_run_next, current_user_token, TaskStatus, current_task, add_task, task_mmap, task_munmap,
+        exit_current_and_run_next, suspend_current_and_run_next, current_user_token, TaskStatus, current_task, add_task, task_mmap, task_munmap, manager::get_task_num,
     }, 
     timer::get_time_us, mm::{copy_bytes, VirtAddr, MapPermission},
 };
@@ -69,9 +69,10 @@ pub fn sys_fork() -> isize {
 }
 
 pub fn sys_exec(path: *const u8) -> isize {
-    trace!("kernel:pid[{}] sys_exec", current_task().unwrap().pid.0);
+    
     let token = current_user_token();
     let path = translated_str(token, path);
+    trace!("kernel:pid[{}] sys_exec , name is : {}", current_task().unwrap().pid.0,path);
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let task = current_task().unwrap();
@@ -85,7 +86,8 @@ pub fn sys_exec(path: *const u8) -> isize {
 /// If there is not a child process whose pid is same as given, return -1.
 /// Else if there is a child process but it is still running, return -2.
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
-    //trace!("kernel: sys_waitpid");
+    trace!("kernel::pid[{}] sys_waitpid [{}]", current_task().unwrap().pid.0, pid);
+    trace!("current task num is {}",get_task_num());
     let task = current_task().unwrap();
     // find a child process
 
@@ -129,6 +131,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     let ts = TimeVal::from_us(time_us);
     let res=copy_bytes(token,&ts,_ts as *mut u8);
     trace!("kernel: sys_get_time");
+    trace!("kernel::pid[{}] sys_get_time {} us", current_task().unwrap().pid.0,time_us);
     res
 }
 
@@ -218,13 +221,13 @@ pub fn sys_sbrk(size: i32) -> isize {
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_spawn ",
-        current_task().unwrap().pid.0
-    );
+    
     let token = current_user_token();
     let path = translated_str(token, _path);
-    
+    trace!(
+        "kernel:pid[{}] sys_spawn ,name is : {}",
+        current_task().unwrap().pid.0,path
+    );
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_inode.read_all();
         let current_task = current_task().unwrap();
@@ -255,7 +258,7 @@ pub fn sys_set_priority(_prio: isize) -> isize {
     if _prio>=2 {
         let task=current_task().unwrap();
         let mut cur_task_inner=task.inner_exclusive_access();
-        cur_task_inner.stride_info.priority=_prio;
+        cur_task_inner.stride_info.priority=_prio.try_into().unwrap();
         return _prio;
     }
     error!("priority didn't fit");

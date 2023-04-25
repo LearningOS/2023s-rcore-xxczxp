@@ -15,12 +15,13 @@
 //! might not be what you expect.
 mod context;
 mod id;
-mod manager;
+pub mod manager;
 mod processor;
 mod switch;
 #[allow(clippy::module_inception)]
 #[allow(rustdoc::private_intra_doc_links)]
 mod task;
+mod stride;
 
 use crate::fs::{open_file, OpenFlags};
 use crate::{timer::get_time_us, syscall::process::TaskInfo, mm::{VirtAddr, MapPermission}};
