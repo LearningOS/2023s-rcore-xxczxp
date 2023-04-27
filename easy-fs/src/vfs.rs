@@ -197,4 +197,37 @@ impl Inode {
         });
         block_cache_sync_all();
     }
+
+    /// delete an entry from inode
+    /// demand inode's entry are all file
+    pub fn delete_entry(&self, entry_id: usize) {
+        let mut fs: MutexGuard<EasyFileSystem> = self.fs.lock();
+        self.modify_disk_inode(|disk_inode| {
+            assert!(entry_id < ((disk_inode.size as usize) / DIRENT_SZ));
+            let mut dirent = DirEntry::empty();
+            disk_inode.read_at(
+                entry_id * DIRENT_SZ,
+                dirent.as_bytes_mut(),
+                &self.block_device,
+            );
+            let (target_blocks, target_offset) = fs.get_disk_inode_pos(dirent.inode_id());
+            let mut need_to_dealloc=false;
+            get_block_cache(target_blocks as usize, Arc::clone(&(self.block_device)))
+                .lock()
+                .modify(target_offset, |target_inode: &mut DiskInode| {
+                    target_inode.strong_count-=1;
+                    if target_inode.strong_count == 0 {
+                        if target_inode.is_dir() {
+                            todo!();
+                        }
+                        need_to_dealloc=true;
+                    }
+                    
+                });
+                if need_to_dealloc {
+                    fs.dealloc_inode(dirent.inode_id());
+                }
+
+        });
+    }
 }

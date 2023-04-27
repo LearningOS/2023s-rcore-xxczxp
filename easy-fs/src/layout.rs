@@ -14,7 +14,9 @@ use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter, Result};
 
 const EFS_MAGIC: u32 = 0x3b800001;
-const INODE_DIRECT_COUNT: usize = 28;
+/// The max number of direct inodes
+const INODE_DIRECT_COUNT: usize = 27;
+/// The max length of inode name
 const NAME_LENGTH_LIMIT: usize = 27;
 const INODE_INDIRECT1_COUNT: usize = BLOCK_SZ / 4;
 const INODE_INDIRECT2_COUNT: usize = INODE_INDIRECT1_COUNT * INODE_INDIRECT1_COUNT;
@@ -102,6 +104,7 @@ pub struct DiskInode {
     pub indirect2: u32,
     /// inode type
     type_: DiskInodeType,
+    pub strong_count:u32
 }
 
 impl DiskInode {
@@ -112,6 +115,7 @@ impl DiskInode {
         self.indirect1 = 0;
         self.indirect2 = 0;
         self.type_ = type_;
+        self.strong_count=1;
     }
     /// inode is directory?
     pub fn is_dir(&self) -> bool {
