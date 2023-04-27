@@ -32,3 +32,4 @@ pub use block_dev::BlockDevice;
 pub use efs::EasyFileSystem;
 pub use layout::*;
 pub use vfs::Inode;
+extern crate log;
