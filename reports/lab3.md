@@ -1,6 +1,10 @@
 ## 实验设计
 
+### 实现sys_spawn
+主要参照了fork和exec，本来想着是不是能偷懒直接把fork和exec串起来，后来发现不行，这俩串起来只能实现改变原有程序的效果，最后就把这两者的代码串起来改一改。
 
+### 实现priority
+在taskBlock中塞进去一个stride_info，之后再fetch_task的时候进行处理就行
 
 
 ## 简答作业
