@@ -196,24 +196,41 @@ impl Inode {
                 dirent.as_bytes_mut(),
                 &self.block_device,
             );
+            
+            // delete entry
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            let mut last_dirent = DirEntry::empty();
+            disk_inode.read_at(
+                (file_count-1) * DIRENT_SZ,
+                last_dirent.as_bytes_mut(),
+                &self.block_device,
+            );
+            // move last entry to deleted entry
+            disk_inode.write_at(entry_id * DIRENT_SZ, last_dirent.as_bytes_mut(), &self.block_device);
+            // set zero for the last slot
+            disk_inode.write_at((file_count-1) * DIRENT_SZ, DirEntry::empty().as_bytes_mut(), &self.block_device);
+            // resize, delete blocks if needed
+            let blocks_dealloc=disk_inode.decrease_size(disk_inode.size-DIRENT_SZ as u32, &self.block_device);
+            for data_block in blocks_dealloc.into_iter() {
+                fs.dealloc_data(data_block);
+            }
+
             let (target_blocks, target_offset) = fs.get_disk_inode_pos(dirent.inode_id());
-            let mut need_to_dealloc=false;
+            let mut need_to_dealloc = false;
             get_block_cache(target_blocks as usize, Arc::clone(&(self.block_device)))
                 .lock()
                 .modify(target_offset, |target_inode: &mut DiskInode| {
-                    target_inode.strong_count-=1;
+                    target_inode.strong_count -= 1;
                     if target_inode.strong_count == 0 {
                         if target_inode.is_dir() {
                             todo!();
                         }
-                        need_to_dealloc=true;
+                        need_to_dealloc = true;
                     }
-                    
                 });
-                if need_to_dealloc {
-                    fs.dealloc_inode(dirent.inode_id());
-                }
-
+            if need_to_dealloc {
+                fs.dealloc_inode(dirent.inode_id());
+            }
         });
     }
 }
