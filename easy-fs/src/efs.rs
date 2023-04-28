@@ -153,12 +153,12 @@ impl EasyFileSystem {
                 let data_blocks_dealloc = disk_inode.clear_size(&self.block_device);
                 assert!(data_blocks_dealloc.len() == DiskInode::total_blocks(size) as usize);
                 for data_block in data_blocks_dealloc.into_iter() {
-                self.dealloc_data(data_block);
-            }
-                
+                    self.dealloc_data(data_block);
+                }
             });
 
-        todo!()
+        self.inode_bitmap
+            .dealloc(&self.block_device, inode_id as usize)
     }
 
     /// Allocate a data block

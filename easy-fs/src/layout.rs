@@ -376,7 +376,7 @@ impl DiskInode {
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
         let mut start = offset;
-        let end = (offset + buf.len()).min(self.size as usize);
+        let end: usize = (offset + buf.len()).min(self.size as usize);
         assert!(start <= end);
         let mut start_block = start / BLOCK_SZ;
         let mut write_size = 0usize;
@@ -405,6 +405,71 @@ impl DiskInode {
             start = end_current_block;
         }
         write_size
+    }
+
+    /// decrease 1 BLOCK,but not change the size
+    fn decrease_block(&mut self,block_device: &Arc<dyn BlockDevice>) -> Vec<u32>{
+        let mut v: Vec<u32> = Vec::new();
+        let inner_id: usize = self.data_blocks() as usize - 1;
+        self.size -= BLOCK_SZ as u32;
+        let now_id : usize = self.data_blocks() as usize - 1;
+        // use for verify
+        let mut block_need_delete=Self::total_blocks((inner_id*BLOCK_SZ) as u32)-Self::total_blocks((now_id*BLOCK_SZ) as u32);
+        if inner_id < INODE_DIRECT_COUNT {
+            v.push(self.direct[inner_id]);
+            block_need_delete-=1;
+        } else if inner_id < INDIRECT1_BOUND {
+            get_block_cache(self.indirect1 as usize, Arc::clone(block_device))
+                .lock()
+                .read(0, |indirect_block: &IndirectBlock| {
+                    v.push(indirect_block[inner_id - INODE_DIRECT_COUNT]);
+                    block_need_delete-=1;
+
+                });
+            if now_id < INODE_DIRECT_COUNT {
+                v.push(self.indirect1);
+                block_need_delete-=1;
+            }
+        } else {
+            let last = inner_id - INDIRECT1_BOUND;
+            let now_last = now_id - INDIRECT1_BOUND;
+            let indirect1 = get_block_cache(self.indirect2 as usize, Arc::clone(block_device))
+                .lock()
+                .read(0, |indirect2: &IndirectBlock| {
+                    indirect2[last / INODE_INDIRECT1_COUNT]
+                });
+            get_block_cache(indirect1 as usize, Arc::clone(block_device))
+                .lock()
+                .read(0, |indirect1: &IndirectBlock| {
+                    v.push(indirect1[last % INODE_INDIRECT1_COUNT]);
+                    block_need_delete-=1;
+                });
+            if now_last / INODE_INDIRECT1_COUNT < last / INODE_INDIRECT1_COUNT {
+                v.push(indirect1);
+                block_need_delete-=1;
+            }
+            if now_id<INDIRECT1_BOUND {
+                v.push(self.indirect2);
+                block_need_delete-=1;
+            }
+        }
+        assert!(block_need_delete==0);
+        v
+    }
+
+    /// decrease size
+    /// but now only support decrease size less than BLOCK_SZ
+    /// return the block id that need the caller to deal with
+    pub fn decrease_size(&mut self,new_size:u32,block_device: &Arc<dyn BlockDevice>) -> Vec<u32> {
+        assert!(new_size <= self.size);
+        assert!(self.size-new_size <= BLOCK_SZ as u32);
+        let mut v=Vec::new();
+        if Self::total_blocks(self.size)!=Self::total_blocks(new_size) {
+            v=self.decrease_block(block_device);
+        }
+        //decrease size
+        self.size=new_size;
+        v
     }
 }
 
