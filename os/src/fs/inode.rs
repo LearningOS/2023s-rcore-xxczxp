@@ -1,7 +1,14 @@
-use super::File;
+//! `Arc<Inode>` -> `OSInodeInner`: In order to open files concurrently
+//! we need to wrap `Inode` into `Arc`,but `Mutex` in `Inode` prevents
+//! file systems from being accessed simultaneously
+//!
+//! `UPSafeCell<OSInodeInner>` -> `OSInode`: for static `ROOT_INODE`,we
+//! need to wrap `OSInodeInner` into `UPSafeCell`
+use super::{File, Stat, StatMode};
 use crate::drivers::BLOCK_DEVICE;
 use crate::mm::UserBuffer;
 use crate::sync::UPSafeCell;
+use _core::any::Any;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -45,6 +52,24 @@ impl OSInode {
             v.extend_from_slice(&buffer[..len]);
         }
         v
+    }
+    pub fn get_stat(&self) -> Stat {
+        let inner = self.inner.exclusive_access();
+        let mut mode = StatMode::NULL;
+        if inner.inode.is_dir() {
+            mode = StatMode::DIR;
+        }
+        if inner.inode.is_file() {
+            mode = StatMode::FILE;
+        }
+
+        Stat {
+            dev: 0,
+            ino: inner.inode.get_inode_id() as u64,
+            mode: mode,
+            nlink: inner.inode.get_strong_count() as u32,
+            pad: [0; 7],
+        }
     }
 }
 
@@ -155,5 +180,8 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+    fn as_any(&self)-> &dyn Any {
+        self
     }
 }

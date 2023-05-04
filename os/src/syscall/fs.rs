@@ -1,5 +1,5 @@
-use crate::fs::{make_pipe, open_file, OpenFlags, Stat};
-use crate::mm::{translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
+use crate::fs::{make_pipe, open_file, OpenFlags, Stat, OSInode};
+use crate::mm::{copy_bytes,translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
 /// write syscall
@@ -126,10 +126,32 @@ pub fn sys_dup(fd: usize) -> isize {
 /// YOUR JOB: Implement fstat.
 pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
     trace!(
-        "kernel:pid[{}] sys_fstat NOT IMPLEMENTED",
-        current_task().unwrap().process.upgrade().unwrap().getpid()
+        "kernel:pid[{}] sys_fstat ,fd: {}",
+        current_task().unwrap().process.upgrade().unwrap().getpid(),
+        _fd
     );
-    -1
+
+
+    let process = current_process();
+    let process_inner = process.inner_exclusive_access();
+    if _fd >= process_inner.fd_table.len() {
+        return -1;
+    }
+    if let Some(file) = process_inner.fd_table[_fd].as_ref() {
+        if let Some(os) = file.as_any().downcast_ref::<OSInode>() {
+            trace!("success downcast");
+            let state = os.get_stat();
+            drop(process_inner);
+            let token = current_user_token();
+            return copy_bytes(token, &state, _st as *mut u8);
+        } else {
+            trace!("is not inode!");
+            return -1;
+        }
+    } else {
+        trace!("fd is none");
+        return -1;
+    }
 }
 
 /// YOUR JOB: Implement linkat.

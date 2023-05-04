@@ -3,6 +3,8 @@
 //! The data struct and functions for the inode layer that service file-related system calls
 //!
 //! NOTICE: The difference between [`Inode`] and [`DiskInode`]  can be seen from their names: DiskInode in a relatively fixed location within the disk block, while Inode Is a data structure placed in memory that records file inode information.
+use crate::BLOCK_SZ;
+
 use super::{
     block_cache_sync_all, get_block_cache, BlockDevice, DirEntry, DiskInode, DiskInodeType,
     EasyFileSystem, DIRENT_SZ,
@@ -247,4 +249,37 @@ impl Inode {
             }
         });
     }
+
+    /// get current inode id
+    pub fn get_inode_id(&self) -> usize{
+        let inode_size = core::mem::size_of::<DiskInode>();
+        let fs: MutexGuard<EasyFileSystem> = self.fs.lock();
+        let node_offset=(self.block_id - fs.inode_area_start_block as usize)*BLOCK_SZ + self.block_offset;
+        node_offset/inode_size
+    }
+
+    /// get current node's strong_count
+    pub fn get_strong_count(&self) -> usize {
+        let _fs: MutexGuard<EasyFileSystem> = self.fs.lock();
+        self.read_disk_inode(|disk_inode| {
+            disk_inode.strong_count as usize
+        })
+    }
+    
+    /// is dir?
+    pub fn is_dir(&self) -> bool {
+        let _fs: MutexGuard<EasyFileSystem> = self.fs.lock();
+        self.read_disk_inode(|disk_inode| {
+            disk_inode.is_dir()
+        })
+    }
+
+    /// is file?
+    pub fn is_file(&self) -> bool {
+        let _fs: MutexGuard<EasyFileSystem> = self.fs.lock();
+        self.read_disk_inode(|disk_inode| {
+            disk_inode.is_file()
+        })
+    }
+
 }
