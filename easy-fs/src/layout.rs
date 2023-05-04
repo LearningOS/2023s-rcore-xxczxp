@@ -359,7 +359,7 @@ impl DiskInode {
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
         let mut start = offset;
-        let end: usize = (offset + buf.len()).min(self.size as usize);
+        let end = (offset + buf.len()).min(self.size as usize);
         assert!(start <= end);
         let mut start_block = start / BLOCK_SZ;
         let mut write_size = 0usize;
