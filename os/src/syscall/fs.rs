@@ -1,8 +1,15 @@
+//! File and filesystem-related syscalls
+
+
 use crate::fs::{make_pipe, open_file, OpenFlags, Stat, OSInode};
 use crate::mm::{copy_bytes,translated_byte_buffer, translated_refmut, translated_str, UserBuffer};
 use crate::task::{current_process, current_task, current_user_token};
 use alloc::sync::Arc;
-/// write syscall
+
+
+use crate::fs::{creat_hard_link, delete_file};
+
+
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_write",
@@ -157,17 +164,39 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
 /// YOUR JOB: Implement linkat.
 pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_linkat NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_linkat",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let token = current_user_token();
+    let old_path = translated_str(token, _old_name);
+    let new_path = translated_str(token, _new_name);
+
+    if let Some(osnode1)=open_file(old_path.as_str(),OpenFlags::all()) {
+
+        match creat_hard_link(new_path.as_str(),osnode1) {
+            Some(_) => {
+                return 0;
+            },
+            None => {
+                error!("creat hard link fail!");
+                return -1;
+            },
+        }
+    }
+    else {
+        error!("can't open old path");
+        return -1;
+    }
+    
 }
 
 /// YOUR JOB: Implement unlinkat.
 pub fn sys_unlinkat(_name: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_unlinkat NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_unlinkat",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+    let token = current_user_token();
+    let path = translated_str(token, _name);
+    delete_file(path.as_str())
 }

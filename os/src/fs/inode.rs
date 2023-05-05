@@ -71,6 +71,7 @@ impl OSInode {
             pad: [0; 7],
         }
     }
+
 }
 
 lazy_static! {
@@ -142,6 +143,17 @@ pub fn open_file(name: &str, flags: OpenFlags) -> Option<Arc<OSInode>> {
             Arc::new(OSInode::new(readable, writable, inode))
         })
     }
+}
+
+///creat hard link
+pub fn creat_hard_link(name:&str,osinode:Arc<OSInode>)->Option<Arc<Inode>>{
+    let other_inner=osinode.inner.exclusive_access();
+    ROOT_INODE.create_from_inode(name, other_inner.inode.clone())
+}
+
+/// delete entry
+pub fn delete_file(name:&str)-> isize {
+    ROOT_INODE.delete_entry(name)
 }
 
 impl File for OSInode {
