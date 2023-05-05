@@ -24,4 +24,4 @@ pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 pub use crate::board::{CLOCK_FREQ, MMIO};
 ///lab5 StrideInfo
 pub const INIT_PRIORITY:u64 = 16;
-pub const BIGSTRDE:u64 = u64::MAX >> 20; 
+pub const BIGSTRDE:u64 = u64::MAX; 
