@@ -114,7 +114,7 @@ use thread::*;
 use crate::fs::Stat;
 use crate::task::info_current_syscall;
 /// handle syscall exception with `syscall_id` and other arguments
-pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+pub fn syscall(syscall_id: usize, args: [usize; 4]) -> isize {
     info_current_syscall(syscall_id);
     match syscall_id {
         SYSCALL_DUP => sys_dup(args[0]),

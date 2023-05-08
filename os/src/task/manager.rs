@@ -4,6 +4,7 @@
 //! Other CPU process monitoring functions are in Processor.
 
 use super::{ProcessControlBlock, TaskControlBlock, TaskStatus};
+use crate::config::BIGSTRDE;
 use crate::sync::UPSafeCell;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::sync::Arc;
@@ -31,7 +32,34 @@ impl TaskManager {
     }
     /// Take a process out of the ready queue
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
-        self.ready_queue.pop_front()
+        if self.ready_queue.is_empty() {
+            error!("fetch can't get, queue is empty");
+            return None;
+        }
+        let mut next_task=self.ready_queue.pop_front().unwrap();
+        for _ in 0..self.ready_queue.len() {
+            let mid_task = self.ready_queue.pop_front().unwrap();
+            if next_task.inner_exclusive_access().stride_info.stride > mid_task.inner_exclusive_access().stride_info.stride {
+                self.ready_queue.push_back(next_task);
+                next_task=mid_task;
+            }
+            else {
+                self.ready_queue.push_back(mid_task);
+            }
+        }
+        let mut inner=next_task.inner_exclusive_access();
+        let stride_info=&mut inner.stride_info;
+        stride_info.stride += BIGSTRDE/stride_info.priority;
+        assert!(stride_info.stride>0);
+        // drop(stride_info);
+        drop(inner);
+
+        // let stride_info=&mut next_task.inner_exclusive_access().stride_info;
+        // stride_info.stride += BIGSTRDE/stride_info.priority;
+        // assert!(stride_info.stride>0);
+        // drop(stride_info);
+
+        Some(next_task)
     }
     pub fn remove(&mut self, task: Arc<TaskControlBlock>) {
         if let Some((id, _)) = self

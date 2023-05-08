@@ -23,8 +23,12 @@ use self::id::TaskUserRes;
 use crate::fs::{open_file, OpenFlags};
 use crate::task::manager::add_stopping_task;
 use crate::timer::remove_timer;
+use crate::{
+    mm::{MapPermission, VirtAddr},
+    syscall::process::TaskInfo,
+    timer::get_time_us,
+};
 use alloc::{sync::Arc, vec::Vec};
-use crate::{timer::get_time_us, syscall::process::TaskInfo, mm::{VirtAddr, MapPermission}};
 pub use context::TaskContext;
 use lazy_static::*;
 use manager::fetch_task;
@@ -207,40 +211,46 @@ pub fn remove_inactive_task(task: Arc<TaskControlBlock>) {
 }
 
 /// lab1
-pub fn info_current_syscall(syscall_id: usize){
-    let task=current_task().unwrap();
-    let mut inner=task.inner_exclusive_access();
-    inner.syscall_info.syscall_times[syscall_id]+=1;
+pub fn info_current_syscall(syscall_id: usize) {
+    let task = current_task().unwrap();
+    let mut inner = task.inner_exclusive_access();
+    inner.syscall_info.syscall_times[syscall_id] += 1;
 }
 
 /// lab1
-pub fn get_task_info()-> TaskInfo{
-    let task=current_task().unwrap();
-    let inner=task.inner_exclusive_access();
-    TaskInfo {status: inner.task_status,
-    syscall_times: inner.syscall_info.syscall_times,
-    time:(get_time_us()-inner.syscall_info.time)/1000}
+pub fn get_task_info() -> TaskInfo {
+    let task = current_task().unwrap();
+    let inner = task.inner_exclusive_access();
+    TaskInfo {
+        status: inner.task_status,
+        syscall_times: inner.syscall_info.syscall_times,
+        time: (get_time_us() - inner.syscall_info.time) / 1000,
+    }
 }
 
 ///lab2
-pub fn task_mmap(start_va: VirtAddr,end_va: VirtAddr,permission:MapPermission)->isize{
-    let task=current_task().unwrap();
-    let process=current_process();
-    let mut cur_process_inner=process.inner_exclusive_access();
-    if cur_process_inner.memory_set.is_overlapping(start_va, end_va) {
+pub fn task_mmap(start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> isize {
+    let process = current_process();
+    let mut cur_process_inner = process.inner_exclusive_access();
+    if cur_process_inner
+        .memory_set
+        .is_overlapping(start_va, end_va)
+    {
         trace!("kernel: mmap overlapping area");
         return -1;
     }
-    cur_process_inner.memory_set.insert_framed_area(start_va,end_va,MapPermission::U | permission);
+    cur_process_inner.memory_set.insert_framed_area(
+        start_va,
+        end_va,
+        MapPermission::U | permission,
+    );
     0
 }
 
-
 ///lab2
-pub fn task_munmap(start_va: VirtAddr,end_va: VirtAddr)->isize{
-    assert!(start_va<end_va);
-    let process=current_process();
-    let mut cur_process_inner=process.inner_exclusive_access();
-    cur_process_inner.memory_set.delete_range(start_va,end_va)
-
+pub fn task_munmap(start_va: VirtAddr, end_va: VirtAddr) -> isize {
+    assert!(start_va < end_va);
+    let process = current_process();
+    let mut cur_process_inner = process.inner_exclusive_access();
+    cur_process_inner.memory_set.delete_range(start_va, end_va)
 }

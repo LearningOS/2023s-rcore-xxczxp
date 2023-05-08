@@ -6,7 +6,7 @@ use crate::trap::TrapContext;
 use crate::{mm::PhysPageNum, sync::UPSafeCell};
 use alloc::sync::{Arc, Weak};
 use core::cell::RefMut;
-use crate::config::{MAX_SYSCALL_NUM};
+use crate::config::{MAX_SYSCALL_NUM, INIT_PRIORITY};
 
 use alloc::boxed::Box;
 
@@ -24,6 +24,21 @@ impl SyscallInfo {
             syscall_times: [0; MAX_SYSCALL_NUM],
             time: 0,
             is_first : true,
+        }
+    }
+}
+
+
+pub struct StrideInfo{
+    pub stride: isize,
+    pub priority:isize
+}
+
+impl StrideInfo {
+    pub fn new() -> Self {
+        Self {
+            stride: 0,
+            priority: INIT_PRIORITY,
         }
     }
 }
@@ -65,6 +80,8 @@ pub struct TaskControlBlockInner {
 
     /// use for lab1
     pub syscall_info:Box<SyscallInfo>,
+
+    pub stride_info:StrideInfo
 }
 
 impl TaskControlBlockInner {
@@ -100,6 +117,7 @@ impl TaskControlBlock {
                     task_status: TaskStatus::Ready,
                     exit_code: None,
                     syscall_info:Box::new(SyscallInfo::zero_init()),
+                    stride_info: StrideInfo::new(),
                 })
             },
         }

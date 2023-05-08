@@ -282,4 +282,118 @@ impl ProcessControlBlock {
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
+    /// lab5
+    pub fn spawn(self: &Arc<Self>, elf_data: &[u8]) -> Arc<Self>{
+
+
+
+        let mut parent_inner = self.inner_exclusive_access();
+
+        // alloc memroy set
+        let (memory_set, ustack_base, entry_point) = MemorySet::from_elf(elf_data);
+
+        // copy fd
+        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        for fd in parent_inner.fd_table.iter() {
+            if let Some(file) = fd {
+                new_fd_table.push(Some(file.clone()));
+            } else {
+                new_fd_table.push(None);
+            }
+        }
+
+        // alloc a pid and a kernel stack in kernel space
+        let pid_handle = pid_alloc();
+
+        // create child process pcb
+        let child = Arc::new(Self {
+            pid:pid_handle,
+            inner: unsafe {
+                UPSafeCell::new(ProcessControlBlockInner {
+                    is_zombie: false,
+                    memory_set,
+                    parent: Some(Arc::downgrade(self)),
+                    children: Vec::new(),
+                    exit_code: 0,
+                    fd_table: new_fd_table,
+                    signals: SignalFlags::empty(),
+                    tasks: Vec::new(),
+                    task_res_allocator: RecycleAllocator::new(),
+                    mutex_list: Vec::new(),
+                    semaphore_list: Vec::new(),
+                    condvar_list: Vec::new(),
+                })
+            },
+        });
+        // add child
+        parent_inner.children.push(Arc::clone(&child));
+
+        // create main thread of child process
+        let task = Arc::new(TaskControlBlock::new(
+            Arc::clone(&child),
+            ustack_base,
+            // here we do not allocate trap_cx or ustack again
+            // but mention that we allocate a new kstack here
+            true,
+        ));
+        
+        let mut task_inner = task.inner_exclusive_access();
+        let user_sp = task_inner.res.as_mut().unwrap().ustack_top();
+
+        //-----------------------------------------------------------------------------------------
+        // // push arguments on user stack
+        // let mut task_inner = task.inner_exclusive_access();
+        // let new_token=task.get_user_token();
+        // trace!("kernel: spawn .. push arguments on user stack");
+        // let mut user_sp = task_inner.res.as_mut().unwrap().ustack_top();
+        // user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        // let argv_base = user_sp;
+        // let mut argv: Vec<_> = (0..=args.len())
+        //     .map(|arg| {
+        //         translated_refmut(
+        //             new_token,
+        //             (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize,
+        //         )
+        //     })
+        //     .collect();
+        // *argv[args.len()] = 0;
+        // for i in 0..args.len() {
+        //     user_sp -= args[i].len() + 1;
+        //     *argv[i] = user_sp;
+        //     let mut p = user_sp;
+        //     for c in args[i].as_bytes() {
+        //         *translated_refmut(new_token, p as *mut u8) = *c;
+        //         p += 1;
+        //     }
+        //     *translated_refmut(new_token, p as *mut u8) = 0;
+        // }
+        // // make the user_sp aligned to 8B for k210 platform
+        // user_sp -= user_sp % core::mem::size_of::<usize>();
+    //-----------------------------------------------------------------------------------------
+
+        // initialize trap_cx
+        trace!("kernel: spawn .. initialize trap_cx");
+        let mut trap_cx = TrapContext::app_init_context(
+            entry_point,
+            user_sp,
+            KERNEL_SPACE.exclusive_access().token(),
+            task.kstack.get_top(),
+            trap_handler as usize,
+        );
+        trap_cx.x[10] = 0;
+        trap_cx.x[11] = 0;
+        *task_inner.get_trap_cx() = trap_cx;
+
+        // attach task to child process
+        let mut child_inner = child.inner_exclusive_access();
+        child_inner.tasks.push(Some(Arc::clone(&task)));
+
+
+        insert_into_pid2process(child.getpid(), Arc::clone(&child));
+        // add this thread to scheduler
+        drop(task_inner);
+        add_task(task);
+        drop(child_inner);
+        child
+    }
 }
