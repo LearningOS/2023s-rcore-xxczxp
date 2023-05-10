@@ -65,7 +65,7 @@ pub fn run_tasks() {
             if task_inner.syscall_info.is_first {
                 task_inner.syscall_info.is_first=false;
                 task_inner.syscall_info.time=get_time_us();
-                trace!("[lab1]task with tid {} and with pid: {} has been start",task_inner.res.as_ref().unwrap().tid,current_process().getpid());
+                trace!("[lab1]task with tid {} and with pid: {} has been start",task_inner.res.as_ref().unwrap().tid,task.process.upgrade().unwrap().getpid());
             }
 
             // release coming task_inner manually

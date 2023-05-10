@@ -50,13 +50,14 @@ impl TaskManager {
         }
 
         //debug
-        trace!("\n\nfetch_task");
-        trace!("choose pid[{}] with stride {}",next_task.process.upgrade().unwrap().getpid(),next_task.inner_exclusive_access().stride_info.stride.0);
-        trace!("other task stride is:");
-        for t in self.ready_queue.iter() {
-            trace!("pid[{}] with stride {}",t.process.upgrade().unwrap().getpid(),t.inner_exclusive_access().stride_info.stride.0);
-        }
-        trace!("\n");
+        // trace!("\n\nfetch_task");
+        // trace!("choose pid[{}] with stride {}",next_task.process.upgrade().unwrap().getpid(),next_task.inner_exclusive_access().stride_info.stride.0);
+        // trace!("other task stride is:");
+        // for t in self.ready_queue.iter() {
+        //     trace!("pid[{}] with stride {}",t.process.upgrade().unwrap().getpid(),t.inner_exclusive_access().stride_info.stride.0);
+        // }
+        // trace!("\n");
+        trace!("fetch_task");
 
         let mut inner=next_task.inner_exclusive_access();
         let stride_info=&mut inner.stride_info;

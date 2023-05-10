@@ -31,6 +31,11 @@ fn sub_one(map:&mut BTreeMap<usize,usize>,id:usize){
 
 
 impl LockGuard {
+    pub fn new()->Self{
+        Self {
+            record:BTreeMap::new()
+        }
+    }
     pub fn add_source(&mut self,s_id:usize,avai_num:usize){
         self.record.insert(s_id,SourceRecord::new(avai_num));
     }
@@ -41,7 +46,7 @@ impl LockGuard {
 
     /// need-1 available-1 allocation+1
     /// must call need_source_one first
-    fn get_source_one(&mut self,tid:usize,s_id:usize) {
+    pub fn get_source_one(&mut self,tid:usize,s_id:usize) {
         let source_record: &mut SourceRecord=self.record.get_mut(&s_id).unwrap();
         assert!(source_record.available!=0);
         source_record.available-=1;
@@ -55,6 +60,12 @@ impl LockGuard {
         add_one_create(&mut source_record.need,tid);
     }
 
+    /// need-1
+    pub fn dont_need_source_one(&mut self,tid:usize,s_id:usize) {
+        let source_record=self.record.get_mut(&s_id).unwrap();
+        sub_one(&mut source_record.need,tid);
+    }
+
     /// available+1 allocation-1
     pub fn return_source_one(&mut self,tid:usize,s_id:usize) {
         let source_record=self.record.get_mut(&s_id).unwrap();
@@ -64,32 +75,58 @@ impl LockGuard {
 
     pub fn check_deadlock(&self,tids:&[usize]) -> bool{
         let mut finish: Vec<bool>=Vec::new();
+        for _ in 0..tids.len() {
+            finish.push(false);
+        }
         let mut work:Vec<usize>=Vec::new();
         let mut allocation:Vec<Vec<usize>>=Vec::new();
         let mut need:Vec<Vec<usize>>=Vec::new();
-        for (s_id,source) in self.record.iter(){
+        for (_s_id,source) in self.record.iter(){
             work.push(source.available);
-            finish.push(false);
             let mut i_allocation:Vec<usize>=Vec::new();
             let mut i_need:Vec<usize>=Vec::new();
             for tid in tids {
-                i_allocation.push(source.allocation.get(tid).unwrap().clone());
-                i_need.push(source.need.get(tid).unwrap().clone());
+                i_allocation.push(
+                    if let Some(i)=source.allocation.get(tid){
+                        *i
+                    }else{
+                        0
+                    }
+                );
+                i_need.push(
+                    if let Some(i)=source.need.get(tid){
+                        *i
+                    }else{
+                        0
+                    }
+                );
             }
             allocation.push(i_allocation);
             need.push(i_need);
         }
+
+        debug!("work is :{:?}",work);
+        debug!("allocation is :{:?}",allocation);
+        debug!("need is :{:?}",need);
         'outer: loop {
-            for i in 0..tids.len() {
-                if finish[i] == false {
-                    if need.iter().enumerate().all(|(j,s)| s[i] == work[j]){
-                        finish[i] = true;
-                        let _v=allocation.iter().enumerate().map(|(j,s)| {work[j]+=s[i]}).collect::<()>();
+            for tid in 0..tids.len() {
+                if finish[tid] == false {
+                    debug!("aaaaaaaaaaaaaaa");
+                    if need.iter().enumerate().all(|(j,s)| s[tid] <= work[j]){
+                        debug!("sssssss1");
+                        finish[tid] = true;
+                        let _v=allocation.iter().enumerate().map(|(j,s)| {work[j]+=s[tid]}).collect::<()>();
+                        continue 'outer;
                     }
+                    debug!("finish is :{:?}",finish);
+                    debug!("work is :{:?}",work);
+                    debug!("allocation is :{:?}",allocation);
+                    debug!("need is :{:?}",need);
+                    
                 }
-                continue 'outer;
             }
-            return finish.iter().all(|&x| x);
+            debug!("finish is :{:?}",finish);
+            return !finish.iter().all(|&x| x);
         }
         
 
